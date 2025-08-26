@@ -315,5 +315,207 @@
 // ============================================================================
 // RUTA: POST /api/parametros/import
 // DESCRIPCIÓN: Importar configuración sistema
-// CONTROLLER: parametrosController.importarConfiguracion# COMENTARIOS DETALLADOS PARA RUTAS - SISTEMA ETAPAS PRODUCTIVAS SENA
+// CONTROLLER: parametrosController.importarConfiguracion
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador'])
+//   - upload.single('configFile')
+//   - validation.validateImportFile
+// VALIDACIONES FILE:
+//   - Formato: JSON o Excel
+//   - Tamaño máximo: 50MB
+//   - Estructura válida configuración
+// PROCESO IMPORTACIÓN:
+//   1. Validar formato archivo
+//   2. Verificar integridad datos
+//   3. Validar dependencias parámetros
+//   4. Crear backup completo actual
+//   5. Aplicar cambios con transacciones
+//   6. Invalidar cache sistema
+//   7. Rollback automático si error
+// VALIDACIONES:
+//   - validateDataIntegrity() - Integridad datos
+//   - validateNoDuplicateKeys() - Sin claves duplicadas
+//   - validateParameterDependencies() - Dependencias válidas
+// RESPONSE: Reporte importación con éxitos/errores
 
+// ============================================================================
+// RUTA: POST /api/parametros/reset
+// DESCRIPCIÓN: Resetear configuración a valores por defecto
+// CONTROLLER: parametrosController.resetearConfiguracionDefecto
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador'])
+//   - validation.validateResetConfirmation
+// BODY REQUEST:
+// {
+//   "categoria": "MODALIDADES", // Opcional, toda la config si no se especifica
+//   "confirmacion": "RESET_CONFIGURACION_SENA_2024",
+//   "backupAntes": true
+// }
+// PROCESO RESET:
+//   1. Validar código confirmación único
+//   2. Crear backup configuración actual
+//   3. Cargar valores por defecto sistema
+//   4. Aplicar cambios con transacciones
+//   5. Invalidar todo el cache
+//   6. Notificar usuarios afectados
+//   7. Log auditoría reset completo
+// VALIDACIONES CRÍTICAS:
+//   - validateConfirmationCode() - Código confirmación correcto
+//   - validateUserAuthorized() - Usuario autorizado resetear
+// RESTRICTIONS: Operación crítica, requiere confirmación especial
+
+// ============================================================================
+// RUTA: GET /api/parametros/:categoria/:clave/historial
+// DESCRIPCIÓN: Historial cambios parámetro específico
+// CONTROLLER: parametrosController.getHistorialCambios
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador'])
+// PARAMS:
+//   - categoria, clave: Identificadores parámetro
+// QUERY PARAMETERS:
+//   - fechaInicio, fechaFin (opcional, filtrar período)
+//   - limite (default: 50)
+// INCLUYE:
+//   - Valores anteriores y nuevos
+//   - Usuario que realizó cambio
+//   - Fecha/hora cambio exacta
+//   - Motivo cambio si aplica
+//   - Impacto sistema registrado
+// USO: Auditoría y troubleshooting configuración
+
+// ============================================================================
+// RUTA: POST /api/parametros/validate-value
+// DESCRIPCIÓN: Validar valor parámetro antes guardarlo
+// CONTROLLER: parametrosController.validateParametroValue
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorizeParametroAccess
+// BODY REQUEST:
+// {
+//   "tipo": "Number",
+//   "valor": 25,
+//   "validacionRules": { "min": 1, "max": 50 },
+//   "contexto": { "categoria": "MODALIDADES", "clave": "HORAS_SEGUIMIENTO" }
+// }
+// VALIDACIONES POR TIPO:
+//   - String: longitud, patrones regex
+//   - Number: rangos, decimales permitidos
+//   - Boolean: true/false estricto
+//   - Object: estructura, propiedades requeridas
+//   - Array: elementos, tipos elementos, longitud
+// RESPONSE: { isValid: boolean, errors: [], warnings: [] }
+
+// ============================================================================
+// RUTA: GET /api/parametros/editables
+// DESCRIPCIÓN: Solo parámetros editables desde UI
+// CONTROLLER: parametrosController.getParametrosEditables
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorizeParametroAccess
+// QUERY PARAMETERS:
+//   - grupoPermisos (filtrar por permisos usuario)
+//   - categoria (opcional)
+// FILTROS AUTOMÁTICOS:
+//   - Solo esEditable: true
+//   - Solo activo: true  
+//   - Solo permisos usuario actual
+// USO: Interfaces configuración usuario
+
+// ============================================================================
+// RUTA: PUT /api/parametros/bulk-update
+// DESCRIPCIÓN: Actualizar múltiples parámetros simultáneamente
+// CONTROLLER: parametrosController.bulkUpdateParametros
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador'])
+//   - validation.validateBulkParametrosUpdate
+// BODY REQUEST:
+// {
+//   "parametrosUpdates": [
+//     {
+//       "id": "ObjectId",
+//       "valor": 10,
+//       "motivo": "Ajuste procedimiento nuevo"
+//     }
+//   ],
+//   "aplicarEnLote": true
+// }
+// VALIDACIONES CRÍTICAS:
+//   - validateAllParametersExist() - Todos existen
+//   - validateAllParametersEditable() - Todos editables
+//   - validateNoDependencyConflicts() - Sin conflictos dependencias
+//   - validateCrossParameterRules() - Validar reglas cruzadas
+// PROCESO TRANSACCIONAL:
+//   1. Validar todos los cambios
+//   2. Crear backup estado actual
+//   3. Actualización transaccional
+//   4. Propagar cambios dependientes
+//   5. Invalidar cache afectado
+//   6. Rollback automático si error
+
+// ============================================================================
+// RUTA: GET /api/parametros/dependencies/:id
+// DESCRIPCIÓN: Ver dependencias parámetro específico
+// CONTROLLER: parametrosController.getParametroDependencies
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador'])
+// RESPONSE:
+// {
+//   "dependentesDirectos": [...], // Parámetros que dependen de este
+//   "dependenciasDe": [...], // Parámetros de los que depende
+//   "impactoSistema": "Alto/Medio/Bajo",
+//   "entidadesAfectadas": ["Modalidad", "Instructor", "EtapaProductiva"]
+// }
+// USO: Evaluar impacto antes modificar parámetros críticos
+
+// ============================================================================
+// RUTA: GET /api/parametros/cache/status
+// DESCRIPCIÓN: Estado cache parámetros sistema
+// CONTROLLER: parametrosController.getCacheStatus
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador'])
+// RESPONSE:
+// {
+//   "cacheActivo": true,
+//   "parametrosCacheados": 145,
+//   "hitRatio": "94.5%",
+//   "ultimaActualizacion": "2024-03-15T10:30:00Z",
+//   "memoryUsage": "2.5MB"
+// }
+
+// ============================================================================
+// RUTA: DELETE /api/parametros/cache
+// DESCRIPCIÓN: Limpiar cache parámetros completo
+// CONTROLLER: parametrosController.clearParametrosCache
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador'])
+// QUERY PARAMETERS:
+//   - categoria (opcional, limpiar categoría específica)
+// USO: Troubleshooting, forzar recarga configuración
+
+// ============================================================================
+// RUTA: GET /api/parametros/audit-log
+// DESCRIPCIÓN: Log auditoría cambios parámetros
+// CONTROLLER: parametrosController.getParametrosAuditLog
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador'])
+//   - validation.validatePagination
+// QUERY PARAMETERS:
+//   - fechaInicio, fechaFin (opcional)
+//   - usuario (opcional, filtrar por usuario)
+//   - categoria (opcional)
+//   - accion (CREATE/UPDATE/DELETE)
+// INCLUYE:
+//   - Timestamp exacto
+//   - Usuario responsable
+//   - Parámetro afectado
+//   - Valores antes/después
+//   - IP origen cambio
+// USO: Auditoría completa cambios configuración

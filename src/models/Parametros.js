@@ -1,521 +1,157 @@
-// ============================================================================
-// RUTA: GET /api/parametros
-// DESCRIPCIÓN: Listar parámetros sistema con filtros
-// CONTROLLER: parametrosController.getAllParametros
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador', 'Coordinador'])
-//   - validation.validatePagination
-// QUERY PARAMETERS:
-//   - page, limit (paginación estándar)
-//   - categoria (MODALIDADES/HORAS_INSTRUCTOR/ESTADOS_SISTEMA/etc.)
-//   - subcategoria (opcional, filtro adicional)
-//   - grupoPermisos (ADMIN_ONLY/COORDINADOR/PUBLICO)
-//   - esEditable (boolean, solo parámetros editables)
-//   - activo (boolean, solo parámetros activos)
-// VALIDACIONES QUERY:
-//   - query('grupoPermisos').optional().isIn(['ADMIN_ONLY', 'COORDINADOR', 'PUBLICO'])
-//   - query('esEditable').optional().isBoolean()
-// PERMISOS: Filtrados por grupo permisos usuario
+// CAMPOS PRINCIPALES:
+// - categoria: String, required, maxlength: 50 // Categoría principal del parámetro
+// - subcategoria: String, maxlength: 50 // Subcategoría opcional
+// - clave: String, required, maxlength: 100 // Clave única del parámetro
+// - valor: Mixed // Valor del parámetro (String, Number, Boolean, Object, Array)
+// - descripcion: String, maxlength: 500 // Descripción del parámetro
+// - tipo: String, enum: ['String', 'Number', 'Boolean', 'Object', 'Array'], required
+// - esEditable: Boolean, default: true // Si puede ser editado desde UI
+// - requiereReinicio: Boolean, default: false // Si requiere reinicio sistema
+// - activo: Boolean, default: true // Si está activo
+// - ordenVisualizacion: Number, default: 0 // Orden para mostrar en UI
+// - fechaCreacion: Date, default: Date.now
+// - fechaActualizacion: Date
+// - usuarioCreacion: ObjectId, ref: 'User'
+// - usuarioActualizacion: ObjectId, ref: 'User'
+// - validacion: Object // Reglas de validación específicas
+// - grupoPermisos: String, enum: ['ADMIN_ONLY', 'COORDINADOR', 'PUBLICO'], default: 'ADMIN_ONLY'
 
-// ============================================================================
-// RUTA: GET /api/parametros/:id
-// DESCRIPCIÓN: Obtener parámetro específico
-// CONTROLLER: parametrosController.getParametroById
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeParametroAccess
-//   - validation.validateMongoId('id')
-// RESPONSE: Configuración completa con historial cambios recientes
+// CATEGORÍAS PRINCIPALES DETECTADAS:
+// 1. MODALIDADES - Configuración modalidades EP
+// 2. HORAS_INSTRUCTOR - Horas por tipo instructor y modalidad
+// 3. TIPOS_DOCUMENTO - CC, TI, CE, PEP
+// 4. ESTADOS_SISTEMA - Estados de EP, bitácoras, seguimientos, etc.
+// 5. ROLES_SISTEMA - Aprendiz, Instructor, Administrador, Coordinador
+// 6. ALERTAS_TIEMPO - Configuración alertas y vencimientos
+// 7. CONFIGURACION_GENERAL - Configuraciones generales sistema
+// 8. REGLAS_NEGOCIO - Reglas específicas de negocio
+// 9. FORMATOS_ARCHIVO - Formatos permitidos subida archivos
+// 10. NOTIFICACIONES - Configuración notificaciones email
+// 11. INTEGRACIONES - Configuración integraciones externas (SGBA, Sofía)
+// 12. REPORTES - Configuración reportes y dashboards
 
-// ============================================================================
-// RUTA: GET /api/parametros/key/:categoria/:clave
-// DESCRIPCIÓN: Obtener parámetro por clave específica
-// CONTROLLER: parametrosController.getParametroByKey
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeParametroAccess
-// PARAMS:
-//   - categoria: Categoría parámetro
-//   - clave: Clave específica parámetro
-// USO: Acceso directo configuración sistema
-// CACHE: Valores frecuentemente accedidos en memoria
-// VALIDACIONES PARAMS:
-//   - param('categoria').notEmpty().isLength({max: 50})
-//   - param('clave').notEmpty().isLength({max: 100})
+// PARÁMETROS ESPECÍFICOS DETECTADOS EN MOCKUPS Y ENTREVISTA:
 
-// ============================================================================
-// RUTA: POST /api/parametros
-// DESCRIPCIÓN: Crear nuevo parámetro sistema
-// CONTROLLER: parametrosController.createParametro
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateParametroCreation
-// VALIDACIONES BODY CRÍTICAS:
-//   - body('categoria').notEmpty().isLength({max: 50})
-//   - body('clave').notEmpty().isLength({max: 100})
-//   - body('valor').notEmpty() // Validación depende del tipo
-//   - body('tipo').isIn(['String', 'Number', 'Boolean', 'Object', 'Array'])
-//   - body('descripcion').notEmpty().isLength({max: 500})
-//   - body('grupoPermisos').isIn(['ADMIN_ONLY', 'COORDINADOR', 'PUBLICO'])
-//   - body('esEditable').isBoolean()
+// MODALIDADES (páginas 14, 21, 50):
+// - MODALIDAD_PASANTIA: { nombre: 'PASANTÍA', horasSegui: 8, horasTecn: 0, horasProy: 0, requiereEmpresa: true }
+// - MODALIDAD_VINCULO_LABORAL: { nombre: 'VÍNCULO LABORAL', horasSegui: 8, subdivis: ['Formativo', 'Regular', 'PYME'] }
+// - MODALIDAD_CONTRATO: { nombre: 'CONTRATO DE APRENDIZAJE', horasSegui: 8, subdivisiones: ['Empresa', 'Campesena'] }
+// - MODALIDAD_PROYECTO_EMPRESARIAL: { horasSegui: 8, horasTecn: 24, horasProy: 48 }
+// - MODALIDAD_PROYECTO_PRODUCTIVO: { horasSegui: 8, horasTecn: 32, horasProy: 0 }
+// - MODALIDAD_PROYECTO_ID: { horasSegui: 8, horasTecn: 32, horasProy: 48 }
+// - MODALIDAD_MONITORIAS: { horasSegui: 0, horasTecn: 0, horasProy: 0 }
+
+// HORAS_INSTRUCTOR:
+// - HORAS_SEGUIMIENTO_BASE: 2 // Por seguimiento
+// - HORAS_BITACORA: 0.25 // Por bitácora (1 hora cada 4)
+// - HORAS_SEGUIMIENTO_ADICIONAL: 2 // Seguimiento extraordinario
+// - HORAS_MENSUALES_INSTRUCTOR: 160 // Horas mensuales disponibles
+// - HORAS_PROYECTO_MENSUAL: 8 // Horas mensuales proyecto productivo
+// - HORAS_BRIGADA_VARIABLE: true // Brigadas según duración
+
+// ESTADOS_SISTEMA:
+// - ESTADOS_ETAPA_PRODUCTIVA: ['Activo', 'Inactivo', 'Completado', 'Cancelado']
+// - ESTADOS_BITACORA: ['Pendiente', 'Ejecutada', 'Verificada']
+// - ESTADOS_SEGUIMIENTO: ['Programada', 'Ejecutada', 'Pendiente', 'Verificada']
+// - ESTADOS_CERTIFICACION: ['Por Certificar', 'Certificado', 'Rechazado']
+// - ESTADOS_APRENDIZ: ['Activo', 'Inactivo', 'Certificado', 'Retirado']
+// - ESTADOS_INSTRUCTOR: ['Activo', 'Inactivo', 'Vacaciones', 'Licencia']
+
+// ALERTAS_TIEMPO:
+// - DIAS_ALERTA_VENCIMIENTO_FICHA: 30 // Días antes alertar vencimiento
+// - DIAS_ALERTA_SEGUIMIENTO: 7 // Días antes alertar seguimiento
+// - DIAS_VENCIMIENTO_BITACORA: 15 // Días para entregar bitácora
+// - MESES_VENCIMIENTO_FICHA_ANTERIOR_NOV2024: 24 // 2 años
+// - MESES_VENCIMIENTO_FICHA_POSTERIOR_NOV2024: 12 // 1 año
+// - MESES_REGISTRO_EP_NUEVAS_FICHAS: 6 // 6 meses para registrar
+// - MESES_EJECUCION_EP_NUEVAS_FICHAS: 6 // 6 meses para ejecutar
+
+// REGLAS_NEGOCIO:
+// - MAX_ETAPAS_PRODUCTIVAS_APRENDIZ: 3 // Máximo 3 EP por aprendiz
+// - MAX_BITACORAS_EP: 12 // Máximo 12 bitácoras
+// - MAX_SEGUIMIENTOS_EP: 3 // Máximo 3 seguimientos
+// - MIN_HORAS_EP_PASANTIA: 864 // Horas mínimas pasantía
+// - MAX_INSTRUCTORES_POR_AREA: 25 // Máximo instructores por área
+// - DIAS_CERTIFICACION_PROCESO: 30 // Días proceso certificación
+// - MAX_INTENTOS_LOGIN: 5 // Máximo intentos fallidos login
+
+// CONFIGURACION_GENERAL:
+// - NOMBRE_INSTITUCION: 'SENA - Centro de Formación Turística'
+// - EMAIL_COORDINACION: 'coordinacion@sena.edu.co'
+// - TELEFONO_CENTRO: '1234567890'
+// - DIRECCION_CENTRO: 'Dirección del centro'
+// - PAGINACION_DEFAULT: 10 // Registros por página
+// - MAX_UPLOAD_SIZE: 10485760 // 10MB máximo archivos
+// - FORMATO_FECHA_SISTEMA: 'DD/MM/YYYY'
+// - ZONA_HORARIA: 'America/Bogota'
+
+// NOTIFICACIONES:
+// - EMAIL_ASIGNACION_INSTRUCTOR: true
+// - EMAIL_BITACORA_VENCIMIENTO: true  
+// - EMAIL_SEGUIMIENTO_ALERTA: true
+// - EMAIL_CERTIFICACION_LISTA: true
+// - TEMPLATE_EMAIL_ASIGNACION: 'template_asignacion'
+// - TEMPLATE_EMAIL_VENCIMIENTO: 'template_vencimiento'
+
+// INTEGRACIONES:
+// - SGBA_API_URL: 'https://api.sgba.sena.edu.co'
+// - SGBA_API_KEY: 'encrypted_api_key'
+// - SOFIA_API_URL: 'https://api.sofia.sena.edu.co'
+// - ONEDRIVE_BASE_URL: 'https://onedrive.live.com'
+// - SYNC_FRECUENCIA_HORAS: 24 // Cada 24 horas sync con SGBA
+
+// MÉTODOS REQUERIDOS:
+// - getParametroByKey(categoria, clave) // Obtener parámetro específico
+// - updateParametro(categoria, clave, nuevoValor) // Actualizar parámetro
+// - createParametro(parametroData) // Crear nuevo parámetro
+// - deleteParametro(categoria, clave) // Eliminar parámetro (solo si esEditable)
+// - getParametrosByCategoria(categoria) // Todos parámetros categoría
+// - validateParametroValue(tipo, valor, validacion) // Validar valor parámetro
+// - getParametrosEditables() // Solo parámetros editables UI
+// - getParametrosByGrupoPermisos(grupo) // Por grupo permisos
+// - exportarConfiguracion() // Exportar toda configuración
+// - importarConfiguracion(configData) // Importar configuración
+// - resetearConfiguracionDefecto() // Resetear valores por defecto
+// - getHistorialCambios(categoria, clave) // Historial cambios parámetro
+
+// MÉTODOS ESPECÍFICOS SISTEMA:
+// - getModalidadesActivas() // Modalidades activas con configuración
+// - getHorasInstructorPorModalidad(modalidad, tipoInstructor) // Horas específicas
+// - getEstadosPermitidosPorEntidad(entidad) // Estados según entidad
+// - getAlertasConfiguration() // Configuración completa alertas
+// - getIntegracionConfiguration(sistema) // Config integración específica
+// - updateModalidadConfiguration(modalidad, config) // Actualizar modalidad
+// - addNuevaModalidad(modalidadData) // Agregar nueva modalidad
+// - getReglasNegocioActivas() // Reglas negocio activas
+// - validateReglaNegeocio(regla, valor) // Validar regla negocio
+
 // VALIDACIONES ESPECÍFICAS:
-//   - validateClaveUnique() - Clave única en categoría
-//   - validateTipoValorConsistente() - Tipo y valor consistentes
-//   - validateValidacionRules() - Reglas validación bien formadas
-//   - validateUserCanCreate() - Usuario puede crear parámetros
-// BODY REQUEST:
-// {
-//   "categoria": "MODALIDADES",
-//   "subcategoria": "HORAS_INSTRUCTOR",
-//   "clave": "HORAS_SEGUIMIENTO_PASANTIA",
-//   "valor": 8,
-//   "tipo": "Number",
-//   "descripcion": "Horas instructor seguimiento para modalidad pasantía",
-//   "validacion": { "min": 1, "max": 50 },
-//   "esEditable": true,
-//   "grupoPermisos": "ADMIN_ONLY"
-// }
+// - validateCategoriaExists() // Categoría existe en sistema
+// - validateClaveUnique(categoria, clave) // Clave única en categoría
+// - validateTipoValorConsistente() // Tipo y valor consistentes
+// - validateValidacionRules() // Reglas validación bien formadas
+// - validateGrupoPermisosExiste() // Grupo permisos existe
+// - validateParametroEditable() // Parámetro puede ser editado
+// - validateValorDentroLimites() // Valor dentro límites definidos
+// - validateDependenciasParametros() // Dependencias entre parámetros
+// - validateFormatoValor() // Formato valor según tipo
+// - validateUsuarioPermisoEdicion() // Usuario tiene permisos edición
 
-// ============================================================================
-// RUTA: PUT /api/parametros/:id
-// DESCRIPCIÓN: Actualizar parámetro existente
-// CONTROLLER: parametrosController.updateParametro
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeParametroEdit
-//   - validation.validateParametroUpdate
-// CAMPOS ACTUALIZABLES:
-//   - valor (principal, con validaciones tipo)
-//   - descripcion
-//   - validacion (reglas)
-//   - activo (activar/desactivar)
-// VALIDACIONES CRÍTICAS:
-//   - validateParametroEditable() - Parámetro es editable
-//   - validateNewValue() - Nuevo valor válido según tipo
-//   - validateDependenciasParametros() - No romper dependencias
-//   - validateSystemImpact() - Evaluar impacto sistema
-// REGLAS ESPECIALES MODALIDADES:
-//   - Actualizar horas instructor → validar áreas afectadas
-//   - Cambios estados sistema → migración datos si necesario
-//   - Modificar alertas → reprogramación tareas automáticas
-// PROCESO:
-//   1. Backup valor anterior
-//   2. Validar impacto sistema
-//   3. Actualizar parámetros relacionados
-//   4. Propagar cambios dependientes
-//   5. Invalidar cache relacionado
-//   6. Log auditoría cambio
+// ÍNDICES REQUERIDOS:
+// - { categoria: 1, clave: 1 } // Único
+// - { categoria: 1, activo: 1 }
+// - { grupoPermisos: 1, activo: 1 }
+// - { esEditable: 1, activo: 1 }
+// - { fechaActualizacion: -1 } // Para auditoría
 
-// ============================================================================
-// RUTA: DELETE /api/parametros/:id
-// DESCRIPCIÓN: Eliminar parámetro (solo si esEditable y sin dependencias)
-// CONTROLLER: parametrosController.deleteParametro
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// VALIDACIONES CRÍTICAS:
-//   - validateParametroEditable() - Es editable
-//   - validateNoDependencies() - Sin dependencias activas
-//   - validateUserCanDelete() - Usuario puede eliminar
-// PROCESO:
-//   1. Verificar dependencias sistema
-//   2. Crear backup antes eliminar
-//   3. Eliminar parámetro
-//   4. Invalidar cache
-//   5. Log auditoría eliminación
+// MIDDLEWARE HOOKS:
+// - pre('save') // Validar antes guardar, actualizar fechaActualizacion
+// - post('save') // Log cambios, invalidar cache, notificar cambios
+// - pre('findOneAndUpdate') // Validar permisos usuario
+// - post('findOneAndUpdate') // Actualizar cache sistema
 
-// ============================================================================
-// RUTA: GET /api/parametros/categoria/:categoria
-// DESCRIPCIÓN: Todos parámetros de categoría específica
-// CONTROLLER: parametrosController.getParametrosByCategoria
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeParametroCategory
-// PARAMS:
-//   - categoria: Categoría específica
-// QUERY PARAMETERS:
-//   - includeInactive (boolean, incluir inactivos)
-// CATEGORÍAS PRINCIPALES:
-//   - MODALIDADES: Configuración modalidades EP
-//   - HORAS_INSTRUCTOR: Distribución horas por tipo
-//   - ESTADOS_SISTEMA: Estados válidos entidades
-//   - ALERTAS_TIEMPO: Configuración alertas y vencimientos
-//   - REGLAS_NEGOCIO: Reglas específicas sistema
-//   - NOTIFICACIONES: Configuración emails
-//   - INTEGRACIONES: APIs externas (SGBA, Sofía)
-// USO: Configuración masiva categorías
-
-// ============================================================================
-// RUTA: PUT /api/parametros/modalidad/:modalidad
-// DESCRIPCIÓN: Actualizar configuración modalidad específica
-// CONTROLLER: parametrosController.updateModalidadConfiguration
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateModalidadConfig
-// PARAMS:
-//   - modalidad: Nombre modalidad
-// BODY REQUEST:
-// {
-//   "horasInstructorSeguimiento": 8,
-//   "horasInstructorTecnico": 24,
-//   "horasInstructorProyecto": 48,
-//   "subdivisiones": ["Vínculo Formativo", "Pasantía Regular"],
-//   "documentosRequeridos": ["Carta intención", "Hoja vida"],
-//   "requiereEmpresa": true
-// }
-// VALIDACIONES ESPECÍFICAS:
-//   - validateModalidadExists() - Modalidad existe
-//   - validateHorasConfiguration() - Configuración horas coherente
-//   - validateSubdivisionesValid() - Subdivisiones válidas
-//   - validateNoActiveEPs() - Sin EP activas (para cambios críticos)
-// PROCESO:
-//   1. Actualizar parámetros modalidad
-//   2. Recalcular proyecciones instructores
-//   3. Notificar instructores afectados
-//   4. Actualizar cache sistema
-
-// ============================================================================
-// RUTA: POST /api/parametros/modalidad
-// DESCRIPCIÓN: Agregar nueva modalidad completa
-// CONTROLLER: parametrosController.addNuevaModalidad
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateNuevaModalidad
-// PROCESO COMPLETO:
-//   1. Crear parámetros modalidad base
-//   2. Configurar horas por tipo instructor
-//   3. Definir documentos requeridos específicos
-//   4. Establecer subdivisiones permitidas
-//   5. Activar en sistema
-//   6. Crear reglas negocio asociadas
-// VALIDACIONES:
-//   - validateModalidadDataComplete() - Datos completos
-//   - validateNombreModalidadUnique() - Nombre único sistema
-//   - validateHorasConfigurationValid() - Configuración coherente
-
-// ============================================================================
-// RUTA: GET /api/parametros/horas-modalidad/:modalidad/:tipoInstructor
-// DESCRIPCIÓN: Horas configuradas modalidad-tipo instructor
-// CONTROLLER: parametrosController.getHorasInstructorPorModalidad
-// MIDDLEWARES:
-//   - auth.authenticateToken
-// PARAMS:
-//   - modalidad: Nombre modalidad
-//   - tipoInstructor: Seguimiento/Técnico/Proyecto
-// RESPONSE: Horas configuradas para combinación específica
-// CACHE: Valores en memoria para acceso rápido
-
-// ============================================================================
-// RUTA: PUT /api/parametros/alertas
-// DESCRIPCIÓN: Actualizar configuración alertas sistema
-// CONTROLLER: parametrosController.updateAlertasConfiguration
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateAlertasConfig
-// BODY REQUEST:
-// {
-//   "DIAS_ALERTA_VENCIMIENTO_FICHA": 30,
-//   "DIAS_ALERTA_SEGUIMIENTO": 7,
-//   "DIAS_VENCIMIENTO_BITACORA": 15,
-//   "FRECUENCIA_EMAILS_ALERTAS": "Diaria",
-//   "HORARIO_ENVIO_ALERTAS": "08:00"
-// }
-// VALIDACIONES:
-//   - validateDiasPositivos() - Días positivos
-//   - validateFrecuenciaValida() - Frecuencia válida
-//   - validateHorarioValido() - Formato horario correcto
-// PROCESO:
-//   1. Actualizar parámetros alertas
-//   2. Reprogramar alertas activas
-//   3. Actualizar trabajos cron
-//   4. Notificar cambios configuración
-
-// ============================================================================
-// RUTA: GET /api/parametros/integracion/:sistema
-// DESCRIPCIÓN: Configuración integración externa específica
-// CONTROLLER: parametrosController.getIntegracionConfiguration
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// PARAMS:
-//   - sistema: SGBA/SOFIA/ONEDRIVE
-// RESPONSE: URLs, configuración conexión (keys encriptadas)
-// SEGURIDAD: Keys API encriptadas, acceso solo administrador
-
-// ============================================================================
-// RUTA: PUT /api/parametros/integracion/:sistema
-// DESCRIPCIÓN: Actualizar configuración integración
-// CONTROLLER: parametrosController.updateIntegracionConfiguration
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateIntegracionConfig
-// VALIDACIONES:
-//   - validateConfigurationFormat() - Formato válido
-//   - validateConnectivity() - Probar conectividad
-// PROCESO:
-//   1. Encriptar claves API nuevas
-//   2. Probar conexión con nueva config
-//   3. Actualizar parámetros sistema
-//   4. Invalidar cache conexiones
-
-// ============================================================================
-// RUTA: GET /api/parametros/reglas-negocio
-// DESCRIPCIÓN: Reglas negocio activas sistema
-// CONTROLLER: parametrosController.getReglasNegocioActivas
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador', 'Coordinador'])
-// RESPONSE: Reglas aplicables con valores actuales
-// REGLAS PRINCIPALES:
-//   - MAX_ETAPAS_PRODUCTIVAS_APRENDIZ: 3
-//   - MAX_BITACORAS_EP: 12
-//   - MAX_SEGUIMIENTOS_EP: 3
-//   - MIN_HORAS_EP_PASANTIA: 864
-//   - DIAS_CERTIFICACION_PROCESO: 30
-
-// ============================================================================
-// RUTA: POST /api/parametros/validar-regla
-// DESCRIPCIÓN: Validar regla negocio específica
-// CONTROLLER: parametrosController.validateReglaNegeocio
-// MIDDLEWARES:
-//   - auth.authenticateToken
-// BODY REQUEST:
-// {
-//   "regla": "MAX_ETAPAS_PRODUCTIVAS_APRENDIZ",
-//   "valor": 3,
-//   "contexto": { "aprendizId": "ObjectId", "fichaId": "ObjectId" }
-// }
-// USO: Validaciones dinámicas sistema
-// RESPONSE: { isValid: boolean, message: string, details: {} }
-
-// ============================================================================
-// RUTA: GET /api/parametros/export
-// DESCRIPCIÓN: Exportar configuración completa sistema
-// CONTROLLER: parametrosController.exportarConfiguracion
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// QUERY PARAMETERS:
-//   - categorias (array, categorías específicas)
-//   - formato (json/excel)
-//   - includeValues (boolean, incluir valores actuales)
-// INCLUYE:
-//   - Todos parámetros por categoría
-//   - Valores actuales configurados
-//   - Descripciones y reglas validación
-//   - Metadata configuración sistema
-// USO: Backup configuración, migración sistemas
-
-// ============================================================================
-// RUTA: POST /api/parametros/import
-// DESCRIPCIÓN: Importar configuración sistema
-// CONTROLLER: parametrosController.importarConfiguracion
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - upload.single('configFile')
-//   - validation.validateImportFile
-// VALIDACIONES FILE:
-//   - Formato: JSON o Excel
-//   - Tamaño máximo: 50MB
-//   - Estructura válida configuración
-// PROCESO IMPORTACIÓN:
-//   1. Validar formato archivo
-//   2. Verificar integridad datos
-//   3. Validar dependencias parámetros
-//   4. Crear backup completo actual
-//   5. Aplicar cambios con transacciones
-//   6. Invalidar cache sistema
-//   7. Rollback automático si error
-// VALIDACIONES:
-//   - validateDataIntegrity() - Integridad datos
-//   - validateNoDuplicateKeys() - Sin claves duplicadas
-//   - validateParameterDependencies() - Dependencias válidas
-// RESPONSE: Reporte importación con éxitos/errores
-
-// ============================================================================
-// RUTA: POST /api/parametros/reset
-// DESCRIPCIÓN: Resetear configuración a valores por defecto
-// CONTROLLER: parametrosController.resetearConfiguracionDefecto
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateResetConfirmation
-// BODY REQUEST:
-// {
-//   "categoria": "MODALIDADES", // Opcional, toda la config si no se especifica
-//   "confirmacion": "RESET_CONFIGURACION_SENA_2024",
-//   "backupAntes": true
-// }
-// PROCESO RESET:
-//   1. Validar código confirmación único
-//   2. Crear backup configuración actual
-//   3. Cargar valores por defecto sistema
-//   4. Aplicar cambios con transacciones
-//   5. Invalidar todo el cache
-//   6. Notificar usuarios afectados
-//   7. Log auditoría reset completo
-// VALIDACIONES CRÍTICAS:
-//   - validateConfirmationCode() - Código confirmación correcto
-//   - validateUserAuthorized() - Usuario autorizado resetear
-// RESTRICTIONS: Operación crítica, requiere confirmación especial
-
-// ============================================================================
-// RUTA: GET /api/parametros/:categoria/:clave/historial
-// DESCRIPCIÓN: Historial cambios parámetro específico
-// CONTROLLER: parametrosController.getHistorialCambios
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// PARAMS:
-//   - categoria, clave: Identificadores parámetro
-// QUERY PARAMETERS:
-//   - fechaInicio, fechaFin (opcional, filtrar período)
-//   - limite (default: 50)
-// INCLUYE:
-//   - Valores anteriores y nuevos
-//   - Usuario que realizó cambio
-//   - Fecha/hora cambio exacta
-//   - Motivo cambio si aplica
-//   - Impacto sistema registrado
-// USO: Auditoría y troubleshooting configuración
-
-// ============================================================================
-// RUTA: POST /api/parametros/validate-value
-// DESCRIPCIÓN: Validar valor parámetro antes guardarlo
-// CONTROLLER: parametrosController.validateParametroValue
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeParametroAccess
-// BODY REQUEST:
-// {
-//   "tipo": "Number",
-//   "valor": 25,
-//   "validacionRules": { "min": 1, "max": 50 },
-//   "contexto": { "categoria": "MODALIDADES", "clave": "HORAS_SEGUIMIENTO" }
-// }
-// VALIDACIONES POR TIPO:
-//   - String: longitud, patrones regex
-//   - Number: rangos, decimales permitidos
-//   - Boolean: true/false estricto
-//   - Object: estructura, propiedades requeridas
-//   - Array: elementos, tipos elementos, longitud
-// RESPONSE: { isValid: boolean, errors: [], warnings: [] }
-
-// ============================================================================
-// RUTA: GET /api/parametros/editables
-// DESCRIPCIÓN: Solo parámetros editables desde UI
-// CONTROLLER: parametrosController.getParametrosEditables
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeParametroAccess
-// QUERY PARAMETERS:
-//   - grupoPermisos (filtrar por permisos usuario)
-//   - categoria (opcional)
-// FILTROS AUTOMÁTICOS:
-//   - Solo esEditable: true
-//   - Solo activo: true  
-//   - Solo permisos usuario actual
-// USO: Interfaces configuración usuario
-
-// ============================================================================
-// RUTA: PUT /api/parametros/bulk-update
-// DESCRIPCIÓN: Actualizar múltiples parámetros simultáneamente
-// CONTROLLER: parametrosController.bulkUpdateParametros
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateBulkParametrosUpdate
-// BODY REQUEST:
-// {
-//   "parametrosUpdates": [
-//     {
-//       "id": "ObjectId",
-//       "valor": 10,
-//       "motivo": "Ajuste procedimiento nuevo"
-//     }
-//   ],
-//   "aplicarEnLote": true
-// }
-// VALIDACIONES CRÍTICAS:
-//   - validateAllParametersExist() - Todos existen
-//   - validateAllParametersEditable() - Todos editables
-//   - validateNoDependencyConflicts() - Sin conflictos dependencias
-//   - validateCrossParameterRules() - Validar reglas cruzadas
-// PROCESO TRANSACCIONAL:
-//   1. Validar todos los cambios
-//   2. Crear backup estado actual
-//   3. Actualización transaccional
-//   4. Propagar cambios dependientes
-//   5. Invalidar cache afectado
-//   6. Rollback automático si error
-
-// ============================================================================
-// RUTA: GET /api/parametros/dependencies/:id
-// DESCRIPCIÓN: Ver dependencias parámetro específico
-// CONTROLLER: parametrosController.getParametroDependencies
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// RESPONSE:
-// {
-//   "dependentesDirectos": [...], // Parámetros que dependen de este
-//   "dependenciasDe": [...], // Parámetros de los que depende
-//   "impactoSistema": "Alto/Medio/Bajo",
-//   "entidadesAfectadas": ["Modalidad", "Instructor", "EtapaProductiva"]
-// }
-// USO: Evaluar impacto antes modificar parámetros críticos
-
-// ============================================================================
-// RUTA: GET /api/parametros/cache/status
-// DESCRIPCIÓN: Estado cache parámetros sistema
-// CONTROLLER: parametrosController.getCacheStatus
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// RESPONSE:
-// {
-//   "cacheActivo": true,
-//   "parametrosCacheados": 145,
-//   "hitRatio": "94.5%",
-//   "ultimaActualizacion": "2024-03-15T10:30:00Z",
-//   "memoryUsage": "2.5MB"
-// }
-
-// ============================================================================
-// RUTA: DELETE /api/parametros/cache
-// DESCRIPCIÓN: Limpiar cache parámetros completo
-// CONTROLLER: parametrosController.clearParametrosCache
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// QUERY PARAMETERS:
-//   - categoria (opcional, limpiar categoría específica)
-// USO: Troubleshooting, forzar recarga configuración
-
-// ============================================================================
-// RUTA: GET /api/parametros/audit-log
-// DESCRIPCIÓN: Log auditoría cambios parámetros
-// CONTROLLER: parametrosController.getParametrosAuditLog
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validatePagination
-// QUERY PARAMETERS:
-//   - fechaInicio, fechaFin (opcional)
-//   - usuario (opcional, filtrar por usuario)
-//   - categoria (opcional)
-//   - accion (CREATE/UPDATE/DELETE)
-// INCLUYE:
-//   - Timestamp exacto
-//   - Usuario responsable
-//   - Parámetro afectado
-//   - Valores antes/después
-//   - IP origen cambio
-// USO: Auditoría completa cambios configuración
+// CACHE STRATEGY:
+// - Cache en memoria parámetros frecuentemente accedidos
+// - Invalidación automática cache al actualizar parámetros
+// - Cache distribuido para múltiples instancias aplicación
+// - TTL configurabe por categoría parámetros
