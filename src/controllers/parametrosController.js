@@ -167,7 +167,7 @@
 // FUNCIÓN: getIntegracionConfiguration
 // DESCRIPCIÓN: Obtener configuración integración externa
 // PARÁMETROS: sistemaIntegracion
-// SISTEMAS: SGBA, SOFIA, ONEDRIVE
+// SISTEMAS: ONEDRIVE
 // RESPUESTA: URLs, keys, configuración conexión
 // SEGURIDAD: Keys encriptadas, acceso solo admin
 
