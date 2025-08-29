@@ -1,5 +1,5 @@
 // ============================================================================
-// RUTA: GET /api/bitacoras
+// RUTA: GET /api/bitacoras     // ruta de administrador
 // DESCRIPCIÓN: Listar bitácoras con filtros avanzados
 // CONTROLLER: bitacoraController.getAllBitacoras
 // MIDDLEWARES:
@@ -23,7 +23,7 @@
 //   - Administrador: Todas las bitácoras
 
 // ============================================================================
-// RUTA: GET /api/bitacoras/:id
+// RUTA: GET /api/bitacoras/:id     // ruta de aprendiz e instructor
 // DESCRIPCIÓN: Obtener bitácora específica con detalles
 // CONTROLLER: bitacoraController.getBitacoraById
 // MIDDLEWARES:
@@ -33,16 +33,7 @@
 // RESPONSE: Datos bitácora, aprendiz, EP, instructor, archivos, observaciones
 
 // ============================================================================
-// RUTA: POST /api/bitacoras
-// DESCRIPCIÓN: Crear nueva bitácora (automático al crear EP)
-// CONTROLLER: bitacoraController.createBitacora
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Sistema']) // Solo llamadas internas automáticas
-// NOTA: Generalmente no se usa directamente, se crean automáticamente al crear EP
-
-// ============================================================================
-// RUTA: PUT /api/bitacoras/:id
+// RUTA: PUT /api/bitacoras/:id  // instructor
 // DESCRIPCIÓN: Actualizar bitácora existente
 // CONTROLLER: bitacoraController.updateBitacora
 // MIDDLEWARES:
@@ -62,7 +53,7 @@
 //   - Coordinador: Observaciones generales
 
 // ============================================================================
-// RUTA: POST /api/bitacoras/:id/upload-file
+// RUTA: POST /api/bitacoras/:id/upload-file   // instructor
 // DESCRIPCIÓN: Subir archivo bitácora firmada
 // CONTROLLER: bitacoraController.uploadBitacoraFile
 // MIDDLEWARES:
@@ -87,8 +78,8 @@
 //   5. Notificar instructor para revisión
 
 // ============================================================================
-// RUTA: PUT /api/bitacoras/:id/validar
-// DESCRIPCIÓN: Validar bitácora por instructor
+// RUTA: PUT /api/bitacoras/:id/validar        //ADMINISTRADOR
+// DESCRIPCIÓN: Validar bitácora por instructor  
 // CONTROLLER: bitacoraController.validateBitacora
 // MIDDLEWARES:
 //   - auth.authenticateToken
@@ -110,7 +101,7 @@
 //   5. Verificar si completó todas bitácoras
 
 // ============================================================================
-// RUTA: PUT /api/bitacoras/:id/rechazar
+// RUTA: PUT /api/bitacoras/:id/rechazar      //ADMINISTRADOR
 // DESCRIPCIÓN: Rechazar bitácora por instructor
 // CONTROLLER: bitacoraController.rejectBitacora
 // MIDDLEWARES:
@@ -123,32 +114,9 @@
 //   2. Agregar observación rechazo
 //   3. Notificar aprendiz
 
-// ============================================================================
-// RUTA: GET /api/bitacoras/etapa-productiva/:epId
-// DESCRIPCIÓN: Bitácoras de EP específica
-// CONTROLLER: bitacoraController.getBitacorasByEtapaProductiva
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeEtapaProductivaAccess
-// QUERY PARAMETERS:
-//   - includeFiles (boolean, incluir enlaces archivos)
-// RESPONSE: Lista ordenada por número bitácora (1-12)
 
 // ============================================================================
-// RUTA: GET /api/bitacoras/instructor/:instructorId
-// DESCRIPCIÓN: Bitácoras asignadas a instructor
-// CONTROLLER: bitacoraController.getBitacorasByInstructor
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeInstructorAccess
-// QUERY PARAMETERS:
-//   - estado (opcional: Pendiente/Ejecutada/Verificada)
-//   - fechaInicio, fechaFin (rango fechas)
-//   - prioridad (boolean, ordenar por vencimiento)
-// RESPONSE: Lista priorizada por fecha vencimiento
-
-// ============================================================================
-// RUTA: POST /api/bitacoras/:id/observacion
+// RUTA: POST /api/bitacoras/:id/observacion      // ADMIN Y APRENDIZ
 // DESCRIPCIÓN: Agregar observación a bitácora
 // CONTROLLER: bitacoraController.addBitacoraObservacion
 // MIDDLEWARES:
@@ -163,7 +131,7 @@
 //   - "Sistema": Observaciones automáticas
 
 // ============================================================================
-// RUTA: GET /api/bitacoras/vencidas
+// RUTA: GET /api/bitacoras/vencidas    // ADMIN , INSTRUCTOR Y APRENDIZ
 // DESCRIPCIÓN: Bitácoras vencidas o próximas vencer
 // CONTROLLER: bitacoraController.checkBitacorasVencidas
 // MIDDLEWARES:
@@ -175,26 +143,10 @@
 // RESPONSE: Lista bitácoras con alertas
 // USO: Alertas automáticas sistema
 
-// ============================================================================
-// RUTA: GET /api/bitacoras/:id/progreso
-// DESCRIPCIÓN: Progreso bitácora específica
-// CONTROLLER: bitacoraController.getBitacoraProgress
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorizeBitacoraAccess
-// RESPONSE:
-// {
-//   "estado": "Ejecutada",
-//   "diasHastaVencimiento": 5,
-//   "archivosAdjuntos": 1,
-//   "observacionesPendientes": 0,
-//   "validada": false,
-//   "fechaVencimiento": "2024-03-15T23:59:59.000Z"
-// }
 
 // ============================================================================
 // RUTA: GET /api/bitacoras/:id/reporte
-// DESCRIPCIÓN: Reporte detallado bitácora
+// DESCRIPCIÓN: Reporte detallado bitácora (TRAER LINK DE ONE DRIVE)
 // CONTROLLER: bitacoraController.generateBitacoraReport
 // MIDDLEWARES:
 //   - auth.authenticateToken
@@ -209,7 +161,7 @@
 
 // ============================================================================
 // RUTA: PUT /api/bitacoras/bulk-validate
-// DESCRIPCIÓN: Validar múltiples bitácoras
+// DESCRIPCIÓN: Validar múltiples bitácoras (IA)
 // CONTROLLER: bitacoraController.bulkValidateBitacoras
 // MIDDLEWARES:
 //   - auth.authenticateToken
@@ -220,23 +172,8 @@
 // USO: Instructor valida varias bitácoras simultáneamente
 
 // ============================================================================
-// RUTA: PUT /api/bitacoras/:id/extender-vencimiento
-// DESCRIPCIÓN: Extender fecha vencimiento bitácora
-// CONTROLLER: bitacoraController.extendBitacoraDeadline
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador', 'Coordinador'])
-// VALIDACIONES BODY:
-//   - body('nuevaFechaVencimiento').isISO8601().toDate()
-//   - body('motivo').notEmpty().isLength({min: 10, max: 500})
-// VALIDACIONES NEGOCIO:
-//   - Nueva fecha posterior a actual
-//   - Motivo válido
-//   - Usuario autorizado
-
-// ============================================================================
 // RUTA: GET /api/bitacoras/estadisticas
-// DESCRIPCIÓN: Estadísticas bitácoras
+// DESCRIPCIÓN: Estadísticas bitácoras (IA)
 // CONTROLLER: bitacoraController.calculateBitacoraStatistics
 // MIDDLEWARES:
 //   - auth.authenticateToken
@@ -256,7 +193,7 @@
 
 // ============================================================================
 // RUTA: GET /api/bitacoras/download/:id
-// DESCRIPCIÓN: Descargar archivo bitácora específica
+// DESCRIPCIÓN: Descargar archivo bitácora específica (APRENDIZ)
 // CONTROLLER: bitacoraController.downloadBitacoraFile
 // MIDDLEWARES:
 //   - auth.authenticateToken

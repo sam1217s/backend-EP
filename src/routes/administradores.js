@@ -1,3 +1,5 @@
+// corregido
+
 // ============================================================================
 // RUTA: GET /api/administradores/users
 // DESCRIPCIÓN: Gestionar todos los usuarios del sistema
@@ -54,22 +56,6 @@
 // RESPONSE: Dashboard ejecutivo con KPIs sistema
 
 // ============================================================================
-// RUTA: POST /api/administradores/maintenance
-// DESCRIPCIÓN: Gestionar modo mantenimiento
-// CONTROLLER: administradorController.manageSystemMaintenance
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateMaintenanceAction
-// VALIDACIONES BODY:
-//   - body('action').isIn(['enableMaintenance', 'disableMaintenance', 'scheduleMaintenance'])
-//   - body('scheduledTime').if(body('action').equals('scheduleMaintenance')).isISO8601()
-//   - body('duration').optional().isInt({min: 5, max: 480}) // minutos
-//   - body('notifyUsers').isBoolean().default(true)
-//   - body('reason').notEmpty().isLength({max: 500})
-// RESPONSE: Estado mantenimiento actualizado
-
-// ============================================================================
 // RUTA: GET /api/administradores/audit-logs
 // DESCRIPCIÓN: Logs completos auditoría sistema
 // CONTROLLER: administradorController.auditLogs
@@ -91,60 +77,6 @@
 //   - query('fechaFin').isISO8601().toDate()
 //   - query('nivel').optional().isIn(['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'])
 // RESPONSE: Logs filtrados con opción exportación
-
-// ============================================================================
-// RUTA: POST /api/administradores/bulk-operations
-// DESCRIPCIÓN: Operaciones masivas sistema
-// CONTROLLER: administradorController.bulkOperations
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateBulkOperation
-// VALIDACIONES BODY:
-//   - body('operationType').isIn(['BULK_USER_IMPORT', 'BULK_DATA_MIGRATION', 'BULK_UPDATE'])
-//   - body('operationConfig').isObject()
-//   - body('dryRun').isBoolean().default(false)
-//   - body('confirmationCode').if(body('dryRun').equals(false)).notEmpty()
-// CONFIRMACIÓN DOBLE: Operaciones destructivas requieren código confirmación
-// RESPONSE: Resultado operación o simulación si dryRun=true
-
-// ============================================================================
-// RUTA: GET /api/administradores/health-check
-// DESCRIPCIÓN: Verificación salud sistema
-// CONTROLLER: administradorController.systemHealthCheck
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// QUERY PARAMETERS:
-//   - runFullCheck (boolean, verificación completa)
-//   - generateReport (boolean, generar reporte detallado)
-//   - autoFix (boolean, reparar problemas automáticamente)
-// VERIFICACIONES:
-//   - Conectividad base datos
-//   - Estado servicios externos
-//   - Integridad archivos
-//   - Performance sistema
-//   - Configuración seguridad
-// RESPONSE: Score salud (0-100) con problemas encontrados
-
-// ============================================================================
-// RUTA: POST /api/administradores/emergency
-// DESCRIPCIÓN: Acciones emergencia situaciones críticas
-// CONTROLLER: administradorController.emergencyActions
-// MIDDLEWARES:
-//   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateEmergencyAction
-// VALIDACIONES BODY:
-//   - body('emergencyType').isIn(['SECURITY_BREACH', 'SYSTEM_FAILURE', 'DATA_CORRUPTION'])
-//   - body('immediateAction').notEmpty()
-//   - body('notifyTeam').isBoolean().default(true)
-//   - body('confirmationCode').notEmpty() // Código emergencia especial
-// TIPOS EMERGENCIA Y ACCIONES:
-//   - SECURITY_BREACH: Bloquear accesos, modo solo lectura
-//   - SYSTEM_FAILURE: Activar respaldos, notificar técnicos
-//   - DATA_CORRUPTION: Restaurar backup, modo mantenimiento
-// RESPONSE: Confirmación acciones ejecutadas
 
 // ============================================================================
 // RUTA: GET /api/administradores/user-sessions
@@ -186,112 +118,153 @@
 // RESPONSE: Reporte generado o URL descarga
 
 // ============================================================================
-// RUTA: PUT /api/administradores/integrations/:sistema
-// DESCRIPCIÓN: Configurar integraciones externas
-// CONTROLLER: administradorController.configureSystemIntegrations
+// RUTA: POST /api/aprendices
+// DESCRIPCIÓN: Crear nuevo aprendiz
+// CONTROLLER: aprendizController.createAprendiz
 // MIDDLEWARES:
 //   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateIntegrationConfig
-// PARAMS:
-//   - sistema: ONEDRIVE/EMAIL_SERVICE/SMS_PROVIDER
+//   - roleValidator.authorize(['Administrador', 'Coordinador'])
+//   - validation.validateAprendizCreation
 // VALIDACIONES BODY:
-//   - body('config').isObject()
-//   - body('testConnection').isBoolean().default(true)
-// CONFIGURACIÓN POR SISTEMA:
-//   - ONEDRIVE: tenantId, clientId, clientSecret
-//   - EMAIL_SERVICE: smtpHost, username, password
-//   - SMS_PROVIDER: apiKey, fromNumber
-// PROCESO:
-//   1. Validar configuración
-//   2. Probar conectividad si testConnection=true
-//   3. Encriptar credenciales
-//   4. Guardar configuración
-// RESPONSE: Estado configuración y resultado test
+//   - body('numeroDocumento').isLength({min: 6, max: 15}).matches(/^[0-9]+$/)
+//   - body('tipoDocumento').isIn(['CC', 'TI', 'CE', 'PEP'])
+//   - body('nombres').notEmpty().isLength({max: 100}).trim()
+//   - body('apellidos').notEmpty().isLength({max: 100}).trim()
+//   - body('emailPersonal').isEmail().normalizeEmail()
+//   - body('emailInstitucional').optional().isEmail().custom(validateSenaEmail)
+//   - body('telefono').matches(/^[0-9]{10}$/)
+//   - body('fichaId').isMongoId()
+//   - body('programaId').isMongoId()
+// BODY REQUEST:
+// {
+//   "numeroDocumento": "1234567890",
+//   "tipoDocumento": "CC",
+//   "nombres": "Juan Carlos",
+//   "apellidos": "Pérez López", 
+//   "emailPersonal": "juan@gmail.com",
+//   "emailInstitucional": "juan@sena.edu.co",
+//   "telefono": "3001234567",
+//   "fichaId": "ObjectId",
+//   "programaId": "ObjectId"
+// }
 
 // ============================================================================
-// RUTA: POST /api/administradores/database-operations
-// DESCRIPCIÓN: Operaciones directas base datos
-// CONTROLLER: administradorController.manageDatabaseOperations
+// RUTA: PUT /api/aprendices/:id
+// DESCRIPCIÓN: Actualizar datos aprendiz
+// CONTROLLER: aprendizController.updateAprendiz
 // MIDDLEWARES:
 //   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateDatabaseOperation
-// VALIDACIONES BODY:
-//   - body('operation').isIn(['QUERY_DATA', 'UPDATE_RECORDS', 'REPAIR_DATA'])
-//   - body('collection').notEmpty()
-//   - body('query').isObject()
-//   - body('backup').isBoolean().default(true)
-//   - body('confirmationCode').notEmpty()
-// OPERACIONES PERMITIDAS:
-//   - QUERY_DATA: Consultas complejas
-//   - UPDATE_RECORDS: Actualizaciones masivas
-//   - REPAIR_DATA: Reparar datos corruptos
-// RESTRICCIONES: Sin operaciones DROP, backup automático
-// RESPONSE: Resultado operación con log detallado
+//   - roleValidator.authorize(['Administrador', 'Coordinador'])
+//   - validation.validateMongoId('id')
+//   - validation.validateAprendizUpdate
+// VALIDACIONES: Campos opcionales para actualización
+// RESTRICTION: No permitir cambio documento, ficha, programa sin validación especial
 
 // ============================================================================
-// RUTA: GET /api/administradores/compliance-audit
-// DESCRIPCIÓN: Herramientas cumplimiento normativo
-// CONTROLLER: administradorController.complianceAndAudit
+// RUTA: DELETE /api/aprendices/:id
+// DESCRIPCIÓN: Inactivar aprendiz (soft delete)
+// CONTROLLER: aprendizController.deleteAprendiz
 // MIDDLEWARES:
 //   - auth.authenticateToken
 //   - roleValidator.authorize(['Administrador'])
+//   - validation.validateMongoId('id')
+// VALIDACIONES BODY:
+//   - body('motivo').notEmpty().isLength({min: 10, max: 500})
+// RESTRICTION: Solo administradores, requiere motivo
+
+
+// ============================================================================
+// RUTA: PUT /api/aprendices/:id/estado
+// DESCRIPCIÓN: Cambiar estado formación aprendiz
+// CONTROLLER: aprendizController.updateAprendizEstado
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador', 'Coordinador'])
+//   - validation.validateEstadoTransition
+// VALIDACIONES BODY:
+//   - body('nuevoEstado').isIn(['En Formación', 'Etapa Productiva', 'Certificado', 'Retirado'])
+//   - body('observaciones').optional().isLength({max: 500})
+
+
+// ============================================================================
+// RUTA: PUT /api/aprendices/:id/transferir-ficha
+// DESCRIPCIÓN: Transferir aprendiz entre fichas
+// CONTROLLER: aprendizController.transferAprendizFicha
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador', 'Coordinador'])
+// VALIDACIONES BODY:
+//   - body('nuevaFichaId').isMongoId()
+//   - body('motivo').notEmpty().isLength({min: 10, max: 500})
+
+
+// ============================================================================
+// RUTA: POST /api/aprendices/bulk-upload
+// DESCRIPCIÓN: Carga masiva aprendices desde Excel/CSV
+// CONTROLLER: aprendizController.bulkUploadAprendices
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador', 'Coordinador'])
+//   - upload.single('file') // Middleware para manejar archivo
+//   - validation.validateBulkUploadFile
+// VALIDACIONES FILE:
+//   - Formato: Excel (.xlsx) o CSV
+//   - Tamaño máximo: 50MB
+//   - Headers requeridos: numeroDocumento, tipoDocumento, nombres, apellidos, etc.
+// RESPONSE: Reporte validación con errores y registros procesados
+
+
+// ============================================================================
+// RUTA: GET /api/instructores
+// DESCRIPCIÓN: Listar instructores con filtros
+// CONTROLLER: instructorController.getAllInstructores
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador', 'Coordinador'])
+//   - validation.validatePagination
 // QUERY PARAMETERS:
-//   - auditType (INTERNAL_AUDIT/EXTERNAL_AUDIT/COMPLIANCE_CHECK)
-//   - period (período auditar)
-//   - generateEvidence (boolean, generar evidencias)
-//   - exportFormat (zip/pdf/excel)
-// TIPOS AUDITORÍA:
-//   - INTERNAL_AUDIT: Procedimientos internos
-//   - EXTERNAL_AUDIT: Preparación auditoría externa
-//   - COMPLIANCE_CHECK: Verificación normativas SENA
-// EVIDENCIAS:
-//   - Logs actividad completos
-//   - Reportes cumplimiento
-//   - Documentación procedimientos
-//   - Trazabilidad cambios
-// RESPONSE: Paquete evidencias completo
+//   - page, limit (paginación estándar)
+//   - search (por nombre/documento)
+//   - especialidad (filtrar por especialidad)
+//   - tipoContrato (Planta/Contratista)
+//   - estado (Activo/Inactivo/Vacaciones/Licencia)
+//   - areasTematicas (filtrar por áreas)
+// VALIDACIONES QUERY:
+//   - query('tipoContrato').optional().isIn(['Planta', 'Contratista'])
+//   - query('estado').optional().isIn(['Activo', 'Inactivo', 'Vacaciones', 'Licencia'])
+
+
 
 // ============================================================================
-// RUTA: PUT /api/administradores/alerts-config
-// DESCRIPCIÓN: Configurar alertas críticas sistema
-// CONTROLLER: administradorController.configureSystemAlerts
+// RUTA: GET /api/instructores/:id
+// DESCRIPCIÓN: Obtener instructor específico con detalles
+// CONTROLLER: instructorController.getInstructorById
 // MIDDLEWARES:
 //   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-//   - validation.validateAlertsConfig
+//   - roleValidator.authorizeInstructorAccess // Instructor puede ver sus datos
+//   - validation.validateMongoId('id')
+// PERMISOS: Instructor solo sus datos, Admin/Coordinador todos
+
+
+// ============================================================================
+// RUTA: POST /api/instructores/:id/asignar-ep
+// DESCRIPCIÓN: Asignar instructor a etapa productiva
+// CONTROLLER: instructorController.assignInstructorToEtapa
+// MIDDLEWARES:
+//   - auth.authenticateToken
+//   - roleValidator.authorize(['Administrador', 'Coordinador'])
 // VALIDACIONES BODY:
-//   - body('alertConfig').isObject()
-//   - body('alertTypes').isArray()
-//   - body('thresholds').isObject()
-//   - body('notificationChannels').isArray()
-// TIPOS ALERTAS:
-//   - SYSTEM_ERROR: Errores críticos
-//   - HIGH_LOAD: Carga alta servidor
-//   - DISK_SPACE: Espacio bajo
-//   - FAILED_BACKUPS: Fallos backup
-//   - SECURITY_BREACH: Accesos sospechosos
-// CONFIGURACIÓN:
-//   - Umbrales activación
-//   - Destinatarios notificación
-//   - Canales (email/SMS/sistema)
-//   - Escalación automática
-// RESPONSE: Configuración alertas actualizada
+//   - body('etapaProductivaId').isMongoId()
+//   - body('tipoInstructor').isIn(['Seguimiento', 'Técnico', 'Proyecto'])
+//   - body('horasProgramadas').isInt({min: 1, max: 200})
 
 // ============================================================================
-// RUTA: GET /api/administradores/cache-management
-// DESCRIPCIÓN: Gestión cache sistema
-// CONTROLLER: administradorController.manageCacheSystem
+// RUTA: DELETE /api/instructores/:instructorId/ep/:etapaId
+// DESCRIPCIÓN: Quitar instructor de etapa productiva
+// CONTROLLER: instructorController.removeInstructorFromEtapa
 // MIDDLEWARES:
 //   - auth.authenticateToken
-//   - roleValidator.authorize(['Administrador'])
-// QUERY PARAMETERS:
-//   - action (status/clear/refresh/configure)
-//   - cacheType (parametros/usuarios/reportes/all)
-// ACCIONES CACHE:
-//   - status: Estado actual cache
-//   - clear: Limpiar cache específico o todo
-//   - refresh: Refrescar cache desde BD
-//   - configure: Configurar parámetros cache
-// RESPONSE: Estado cache y resultado acción
+//   - roleValidator.authorize(['Administrador', 'Coordinador'])
+// VALIDACIONES BODY:
+//   - body('motivo').notEmpty().isLength({min: 10, max: 500})
+
